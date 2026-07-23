@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 from datetime import datetime
+import plotly.express as px
 
 st.set_page_config(
     page_title="목포시민 카페 이용 실태 조사",
@@ -246,13 +247,12 @@ elif page == "📝 설문 참여":
 
         st.success("설문이 정상적으로 제출되었습니다.")
 
-
 # ===============================
 # 관리자 페이지
 # ===============================
 elif page == "🔐 관리자":
 
-    st.header("관리자 페이지")
+    st.header("🔐 관리자 페이지")
 
     password = st.text_input(
         "비밀번호를 입력하세요.",
@@ -267,102 +267,268 @@ elif page == "🔐 관리자":
 
         st.markdown("---")
 
-        st.subheader("📊 응답 현황")
-
-        st.metric(
-            "총 응답자 수",
-            len(df)
+        tab1, tab2 = st.tabs(
+            [
+                "📊 실제 설문 결과",
+                "🔍 실제 응답 vs 페르소나 비교"
+            ]
         )
 
-        if len(df) == 0:
-            st.warning("아직 응답 데이터가 없습니다.")
-            st.stop()
 
-        import plotly.express as px
+        # ==================================
+        # 실제 설문 결과
+        # ==================================
+        with tab1:
 
-        # ----------------------------
-        # 그래프 출력 함수
-        # ----------------------------
+            st.subheader("📊 응답 현황")
 
-        def draw_chart(column, title):
-
-            count = (
-                df[column]
-                .value_counts()
-                .reset_index()
+            st.metric(
+                "총 응답자 수",
+                len(df)
             )
 
-            count.columns = [column, "응답수"]
+            if len(df) == 0:
+                st.warning("아직 응답 데이터가 없습니다.")
+                st.stop()
 
-            fig = px.bar(
-                count,
-                x=column,
-                y="응답수",
-                text="응답수",
-                title=title,
-                color="응답수"
-            )
 
-            fig.update_layout(
-                showlegend=False
-            )
+            import plotly.express as px
 
-            st.plotly_chart(
-                fig,
+
+            def draw_chart(column, title):
+
+                count = (
+                    df[column]
+                    .value_counts()
+                    .reset_index()
+                )
+
+                count.columns = [
+                    column,
+                    "응답수"
+                ]
+
+
+                fig = px.bar(
+                    count,
+                    x=column,
+                    y="응답수",
+                    text="응답수",
+                    title=title
+                )
+
+
+                fig.update_layout(
+                    showlegend=False
+                )
+
+
+                st.plotly_chart(
+                    fig,
+                    use_container_width=True
+                )
+
+
+            draw_chart("거주지역", "거주 지역")
+            draw_chart("연령", "연령")
+            draw_chart("성별", "성별")
+            draw_chart("이용빈도", "카페 이용 빈도")
+            draw_chart("이용목적", "카페 이용 목적")
+            draw_chart("카페종류", "선호 카페 종류")
+            draw_chart("평균지출", "평균 지출 금액")
+            draw_chart("재방문의사", "재방문 의사")
+
+
+            st.divider()
+
+
+            st.subheader("📝 카페 선택 중요 요소")
+
+            for i, text in enumerate(
+                df["선택요소"],
+                start=1
+            ):
+
+                if pd.notna(text) and str(text).strip():
+
+                    st.write(
+                        f"{i}. {text}"
+                    )
+
+
+            st.divider()
+
+
+            st.subheader("📝 카페 이용 불편사항")
+
+            for i, text in enumerate(
+                df["불편사항"],
+                start=1
+            ):
+
+                if pd.notna(text) and str(text).strip():
+
+                    st.write(
+                        f"{i}. {text}"
+                    )
+
+
+            st.divider()
+
+
+            st.subheader("📄 전체 응답 데이터")
+
+            st.dataframe(
+                df,
                 use_container_width=True
             )
 
-        draw_chart("거주지역", "거주 지역")
-        draw_chart("연령", "연령")
-        draw_chart("성별", "성별")
-        draw_chart("이용빈도", "카페 이용 빈도")
-        draw_chart("이용목적", "카페 이용 목적")
-        draw_chart("카페종류", "선호하는 카페 종류")
-        draw_chart("평균지출", "평균 지출 금액")
-        draw_chart("재방문의사", "재방문 의사")
 
-        st.markdown("---")
+            csv = df.to_csv(
+                index=False,
+                encoding="utf-8-sig"
+            )
 
-        st.subheader("📝 카페 선택 시 중요하게 생각하는 요소")
 
-        for i, text in enumerate(df["선택요소"], start=1):
+            st.download_button(
+                "📥 CSV 다운로드",
+                data=csv,
+                file_name="responses.csv",
+                mime="text/csv"
+            )
 
-            if pd.notna(text) and str(text).strip() != "":
 
-                st.write(f"{i}. {text}")
 
-        st.markdown("---")
+        # ==================================
+        # 실제 vs 페르소나 비교
+        # ==================================
+        with tab2:
 
-        st.subheader("📝 카페 이용 시 불편사항")
+            st.subheader(
+                "🔍 실제 시민 응답과 페르소나 비교"
+            )
 
-        for i, text in enumerate(df["불편사항"], start=1):
 
-            if pd.notna(text) and str(text).strip() != "":
+            try:
 
-                st.write(f"{i}. {text}")
+                persona = pd.read_csv(
+                    "persona_responses.csv"
+                )
 
-        st.markdown("---")
 
-        st.subheader("📄 전체 응답 데이터")
+                st.write(
+                    f"실제 응답 : {len(df)}명"
+                )
 
-        st.dataframe(
-            df,
-            use_container_width=True
-        )
+                st.write(
+                    f"페르소나 : {len(persona)}명"
+                )
 
-        csv = df.to_csv(
-            index=False,
-            encoding="utf-8-sig"
-        )
 
-        st.download_button(
-            "📥 CSV 다운로드",
-            data=csv,
-            file_name="responses.csv",
-            mime="text/csv"
-        )
+                def compare_chart(
+                    column,
+                    title
+                ):
+
+
+                    real = (
+                        df[column]
+                        .value_counts()
+                        .reset_index()
+                    )
+
+                    real.columns = [
+                        "항목",
+                        "실제 응답"
+                    ]
+
+
+                    virtual = (
+                        persona[column]
+                        .value_counts()
+                        .reset_index()
+                    )
+
+                    virtual.columns = [
+                        "항목",
+                        "페르소나"
+                    ]
+
+
+                    compare = pd.merge(
+                        real,
+                        virtual,
+                        on="항목",
+                        how="outer"
+                    ).fillna(0)
+
+
+                    compare = compare.melt(
+                        id_vars="항목",
+                        value_vars=[
+                            "실제 응답",
+                            "페르소나"
+                        ],
+                        var_name="구분",
+                        value_name="인원"
+                    )
+
+
+                    fig = px.bar(
+                        compare,
+                        x="항목",
+                        y="인원",
+                        color="구분",
+                        barmode="group",
+                        title=title
+                    )
+
+
+                    st.plotly_chart(
+                        fig,
+                        use_container_width=True
+                    )
+
+
+                compare_chart(
+                    "이용목적",
+                    "☕ 카페 이용 목적 비교"
+                )
+
+
+                compare_chart(
+                    "카페종류",
+                    "🏪 선호 카페 종류 비교"
+                )
+
+
+                compare_chart(
+                    "이용빈도",
+                    "⏰ 이용 빈도 비교"
+                )
+
+
+                compare_chart(
+                    "평균지출",
+                    "💰 평균 지출 비교"
+                )
+
+
+                compare_chart(
+                    "재방문의사",
+                    "🔁 재방문 의사 비교"
+                )
+
+
+            except FileNotFoundError:
+
+                st.error(
+                    "persona_responses.csv 파일을 찾을 수 없습니다."
+                )
+
 
     elif password != "":
 
-        st.error("비밀번호가 올바르지 않습니다.")
-        
+        st.error(
+            "비밀번호가 올바르지 않습니다."
+        )
